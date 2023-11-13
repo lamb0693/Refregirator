@@ -21,6 +21,13 @@ typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
 } CONSOLE_SCREEN_BUFFER_INFO;
 */
 
+typedef struct {
+    char name[20];
+    int count;
+    time_t start_date;
+    time_t expire_date;
+} _ITEM;
+
 typedef struct  {
     int x;
     int y;
@@ -31,6 +38,8 @@ bool getCursorPosition(_CURSOR_POS* cursor_pos);
 bool setCursorPosition(_CURSOR_POS* cursor_pos);
 bool clearConsole();
 void printMenu();
+bool initializedMemroyForReservedItem();
+bool addReservedItem(_ITEM* item);
 
 const char* MENU[] = {
     "1 >> Display Current Foods\n",
@@ -41,8 +50,15 @@ const char* MENU[] = {
 
 _CURSOR_POS cursorPos = { 0.0 };
 
+_ITEM* reservedItem;
+int countOfItems = 0;
+
+
+
 int main()
 {
+    initializedMemroyForReservedItem();
+
 
     cursorPos = { 0,2 };
     printMenu();
@@ -123,6 +139,41 @@ void printMenu() {
     setTextNormal();
     printf("***********************************\n");
     setCursorPosition(&cursorPos);
+}
+
+// 일단 처음에 5개 영역 확보
+bool initializedMemroyForReservedItem() {
+
+    reservedItem = (_ITEM*) malloc(5 * sizeof(_ITEM));
+    if (reservedItem == NULL) {
+        printf("Error!!! Cannot allocate memory for reservedItem ");
+        return false;
+    }
+    else {
+        return true;
+    }
+}
+
+// 메모리 reallocation은 5의 변수 일때만
+// 메모리가 남아있으면 item add
+// 메모리가 모자라면 새로 allocation 후 대입
+bool addReservedItem(_ITEM* item) {
+    // 메모리가 모자라면 새로운 memory를 확보 후 이전 데이터를 복사하고 현재 내용을 덧 붙임
+    if (countOfItems %5 == 0) {
+        _ITEM* tempItems = (_ITEM*)malloc((countOfItems +5) * sizeof(_ITEM));
+        if (tempItems == 0) {
+            printf("Error!!! cannot allocate for memory to tempItems");
+            return false;
+        }
+        else {
+            memcpy(tempItems, reservedItem, countOfItems * sizeof(_ITEM));
+            free(reservedItem);
+            reservedItem = tempItems;
+        }
+
+        tempItems[countOfItems] = *item;
+        countOfItems++;
+        return true;
 }
 
 /*
