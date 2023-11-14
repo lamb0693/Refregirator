@@ -46,6 +46,7 @@ bool addReservedItem(_ITEM* item);
 void doAction(int option);
 bool doAddNewItem();
 char* getFormatedStringByTime_t(time_t* ttCurrent);
+void doListItems();
 
 const char* MENU[] = {
     "1 >> Display Current Foods\n",
@@ -96,19 +97,44 @@ int main()
 void doAction(int option) {
     printf("Enter key was clicked in row %d", option);
     switch (option) {
-    case NO_OF_TITLE_LINE : break;
+    case NO_OF_TITLE_LINE : 
+        doListItems();
+        break;
     case NO_OF_TITLE_LINE+1: break;
     case NO_OF_TITLE_LINE+2:
         if (doAddNewItem() == false) { printf("Error !!! doAddNewItem()"); exit(1); };
         break;
     case NO_OF_TITLE_LINE+3: 
-        exit(1);
+        exit(0);
     default:break;
     }
 }
 
-bool doListItems() {
-    return true;
+void doListItems() {
+    clearConsole();
+    printf("*****************************************\n");
+    printf("보관중인 품목들입니다");
+    printf("*****************************************\n\n");
+
+
+    for (int i = 0; i < countOfItems; i++) {
+        printf("아이템 이름 : ");
+        printf("%s\n", reservedItem[i].name);
+        printf("아이템 갯수 : ");
+        printf("%d\n", reservedItem[i].count);
+        printf("보관날자 : ");
+        char* start_date = getFormatedStringByTime_t(&reservedItem[i].start_date);
+        printf("%s", start_date);
+        free(start_date);
+        printf("유통기한 : ");
+        char* expire_date = getFormatedStringByTime_t(&reservedItem[i].expire_date);
+        printf("%s\n", expire_date);
+        free(expire_date);
+    }
+
+    printf("확인 하셨으면 y 키를 누르세요 >>");
+    while (_getch() != 'y') {};
+
 }
 
 bool doAddNewItem() {
@@ -128,7 +154,7 @@ bool doAddNewItem() {
 
     // 유통기한 입력하기
     struct tm inputTime = { 0 };
-    printf("Enter date and time (YYYY-MM-DD) >> ");
+    printf("유통기한 입력을 입력한다 (YYYY-MM-DD) >> ");
     int retry = 0;
     while(scanf_s("%d-%d-%d",  &inputTime.tm_year, &inputTime.tm_mon, &inputTime.tm_mday) != 3) {
         retry++;
