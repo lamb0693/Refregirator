@@ -188,11 +188,8 @@ char* getFormatedStringByTime_t(time_t* ttCurrent) {
     struct tm localTM;
     localtime_s(&localTM, ttCurrent);
     char* buff = (char*)malloc(sizeof(char)*256) ;
-    if (buff == 0) { printf("Error getFormatedStringByTime_t\n"); exit(1); }
-    else {
-        asctime_s(buff, sizeof(char) * 256, &localTM);
-        return buff;
-    }
+    asctime_s(buff, sizeof(char)*256 , &localTM);
+    return buff;
 }
 
 
