@@ -9,9 +9,9 @@
 
 #define ARROW_DOWN 80
 #define ARROW_UP 72
-#define CURSOR_LIMIT_UP 3  // CURSOR가 올라 갈 수 있는 한계
-#define CURSOR_LIMINT_DOWN 6  // CURSOR가 내려 갈 수 있는 한계
-#define NO_OF_TITLE_LINE 3  // 위의 빈줄 수
+#define CURSOR_LIMIT_UP 4  // MENU 화면에서 CURSOR가 올라 갈 수 있는 한계
+#define CURSOR_LIMINT_DOWN 8  // MENU 화면에서 CURSOR가 내려 갈 수 있는 한계
+#define NO_OF_TITLE_LINE 4  // MENU화면에서 위의 빈줄 수
 
 /*
 *  CONSOLE_SCRREN_BUFFER_INFO 구조
@@ -24,6 +24,7 @@ typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
 } CONSOLE_SCREEN_BUFFER_INFO;
 */
 
+// 보관 물품 항목에 대한 구조체
 typedef struct {
     char name[20];
     int count;
@@ -31,35 +32,56 @@ typedef struct {
     time_t expire_date;
 } _ITEM;
 
+// 커서 포지션에 대한 구조체
 typedef struct  {
     int x;
     int y;
 } _CURSOR_POS;
 
-//void ErrorExit(LPTSTR lpszFunction);
+
 bool getCursorPosition(_CURSOR_POS* cursor_pos);
 bool setCursorPosition(_CURSOR_POS* cursor_pos);
 bool clearConsole();
-void printMenu();
-bool initializedMemroyForReservedItem();
-bool addReservedItem(_ITEM* item);
-void doAction(int option);
-bool doAddNewItem();
-char* getFormatedStringByTime_t(time_t* ttCurrent);
-void doListItems();
 
+// 시작하면서 _ITEM* 5개에 대한 memory 확보
+bool initializedMemroyForReservedItem();
+
+void printMenu();
+void doAction(int option);
+void doListItems();
+// _ITEM 갯수가 5의 배수로 되면 남아있는 메모리 제거후 다시 메모리 획득기능 포함
+bool doDeleteItem(); // remove 기본 작업
+bool removeFromReservedItem(int itemNo); // 실제 remove 기능
+// 새로운 아이템을 추가할 시 _ITEM 에 대한 메모리 모자라면 추가하는 기능 포함
+bool doAddNewItem(); // add 기본 작업
+bool addReservedItem(_ITEM* item); // 실제 add 기능
+// 저장된 아이템을 수정하는 기능
+bool doModifyItem(); // 수정 기본 작업
+bool modifyReservedItem(int select); // 실제 수정 기능
+
+// 위의 함수를 보조하기 위한  함수
+bool printReservedItem();
+char* getFormatedStringByTime_t(time_t* ttCurrent);
+
+
+// 기본 화면에 표시할 메뉴 문자열
 const char* MENU[] = {
     "1 >> Display Current Foods\n",
     "2 >> Remove Food\n",
     "3 >> New Food\n",
-    "4 >> Exit\n"
+    "4 >> Modify Item\n",
+    "5 >> Exit\n"
 };
 
+// 현재 cursor의 위치
 _CURSOR_POS cursorPos = { 0.0 };
 
+// 현재 냉장고 보관 물품 목록
 _ITEM* reservedItem;
-int countOfItems = 0;
 
+// 현재 냉장고 보관 품목 수
+//reservedItem과 항상 동기를 정확히 시켜주어야 함
+int countOfItems = 0;
 
 
 int main()
@@ -94,49 +116,39 @@ int main()
     }
 }
 
+// 메뉴의 키가 선택되면 해당 함수를 호출
 void doAction(int option) {
-    printf("Enter key was clicked in row %d", option);
+    //printf("Enter key was clicked in row %d", option);
     switch (option) {
     case NO_OF_TITLE_LINE : 
         doListItems();
         break;
-    case NO_OF_TITLE_LINE+1: break;
+    case NO_OF_TITLE_LINE+1:
+        doDeleteItem();
+        break;
     case NO_OF_TITLE_LINE+2:
         if (doAddNewItem() == false) { printf("Error !!! doAddNewItem()"); exit(1); };
         break;
-    case NO_OF_TITLE_LINE+3: 
+    case NO_OF_TITLE_LINE+3:
+        if(doModifyItem() == false ) { printf("Error !!! doModifyItem()"); exit(1); }
+        break;
+    case NO_OF_TITLE_LINE+4: 
         exit(0);
     default:break;
     }
 }
 
+// 전체 항목을 표시해 주는 역할
 void doListItems() {
     clearConsole();
-    printf("*****************************************\n");
-    printf("보관중인 품목들입니다");
-    printf("*****************************************\n\n");
-
-
-    for (int i = 0; i < countOfItems; i++) {
-        printf("아이템 이름 : ");
-        printf("%s\n", reservedItem[i].name);
-        printf("아이템 갯수 : ");
-        printf("%d\n", reservedItem[i].count);
-        printf("보관날자 : ");
-        char* start_date = getFormatedStringByTime_t(&reservedItem[i].start_date);
-        printf("%s", start_date);
-        free(start_date);
-        printf("유통기한 : ");
-        char* expire_date = getFormatedStringByTime_t(&reservedItem[i].expire_date);
-        printf("%s\n", expire_date);
-        free(expire_date);
-    }
+    printReservedItem();
 
     printf("확인 하셨으면 y 키를 누르세요 >>");
     while (_getch() != 'y') {};
 
 }
 
+// 새로운 항목을 추가 해 줌 - 실제 기능은 addReservedItem() 함수가 시행
 bool doAddNewItem() {
     _ITEM newItem;
     clearConsole();
@@ -172,14 +184,121 @@ bool doAddNewItem() {
     }
     else {
         char* expDate = getFormatedStringByTime_t(&newItem.expire_date);
-        printf("입력한 Expire date : %s", expDate);
+        printf("입력한 Expire date : %s\n", expDate);
         free(expDate);
     }
 
     if (addReservedItem(&newItem) == false) { printf("Error!!! fail to add ReservedItem()"); exit(0); }
 
-    printf("확인 하셨으면 y 키를 누르세요 >>");
+    printf("\n확인 하셨으면 y 키를 누르세요 >>");
     while (_getch() != 'y') {};
+
+    return true;
+}
+
+bool doDeleteItem() {
+    clearConsole();
+    printf("*****************************************\n");
+    printf("삭제할 품목의 번호를 선택하고 엔터를 누르세요\n");
+    printf("*****************************************\n");
+
+    printReservedItem();
+
+    int select;
+    int countOfTry = 0;
+
+    // buffer를 비움
+    while (getchar() != '\n');
+
+    while (true) {
+        if (countOfTry == 3) break;
+
+        printf("\n지울 아이템의  번호를 입력하세요 >> ");
+        if (scanf_s("%d", &select) == 0) {
+            countOfTry++;
+            continue;
+        }
+
+        if (select < 0 || select >= countOfItems) {
+            printf("잘못된 번호입니다\n");
+            countOfTry++;
+            continue;
+        }
+
+        break;
+    }
+    
+
+    printf("\n 지울 항목 %d 맞으면 y,  아니라면  n 을 입력", select);
+    while (true) {
+        char answer = _getch();
+        if (answer == 'y') {
+            removeFromReservedItem(select);
+            break;
+        }
+        else if (answer == 'n') break;
+    } 
+    
+    return true;
+}
+
+bool doModifyItem() {
+    clearConsole();
+    printReservedItem();
+
+    int select;
+    int countOfTry = 0;
+
+    // buffer를 비움
+    while (getchar() != '\n');
+
+    while (true) {
+        if (countOfTry == 3) return false;
+        printf("\n수정할 아이템의  번호를 입력하세요 >> ");
+        if (scanf_s("%d", &select) == 0) {
+            countOfTry++;
+            continue;
+        }
+        if (select < 0 || select >= countOfItems) {
+            printf("잘못된 번호입니다\n");
+            countOfTry++;
+            continue;
+        }
+        break;
+    }
+
+    printf("\n 수정할 항목이  [[ %d ]]  맞으면 y,  아니라면  n 을 입력", select);
+    while (true) {
+        char answer = _getch();
+        if (answer == 'y') {
+            if( modifyReservedItem(select) == true) return true;
+            else {
+                printf("Error!!! modifyReservedItem  실행중 error 발생");
+                return false;
+            } 
+        }
+        else if (answer == 'n') break;
+    }
+
+    return true;
+}
+
+
+bool printReservedItem() {
+    printf("\n------------------------------------------------------------------------------------------------\n");
+    printf("%5s  %-20s  %-5s  %-30s  %-30s\n", "번호", "   품목 이름", "갯수", "입고날자", "유통기한");
+    printf("------------------------------------------------------------------------------------------------\n");
+    for (int i = 0; i < countOfItems; i++) {
+        char* start_date = getFormatedStringByTime_t(&reservedItem[i].start_date);
+        char* expire_date = getFormatedStringByTime_t(&reservedItem[i].expire_date);
+        //printf("%-20s\n", expire_date);
+        printf("%5d  %-20s  %3d개  %-30s  %-30s\n", i, reservedItem[i].name, reservedItem[i].count, start_date, expire_date);
+        free(start_date);
+        free(expire_date);
+    }
+    printf("------------------------------------------------------------------------------------------------\n");
+
+    return true;
 }
 
 // time_t => YYYY-MM-DD 로 변환
@@ -191,6 +310,13 @@ char* getFormatedStringByTime_t(time_t* ttCurrent) {
     if (buff == 0) { printf("Error getFormatedStringByTime_t\n"); exit(1); }
     else {
         asctime_s(buff, sizeof(char) * 256, &localTM);
+
+        // 끝에 포함된 \n을 없앤다.
+        size_t length = strlen(buff);
+        if (length > 0 && buff[length - 1] == '\n') {
+            buff[length - 1] = '\0'; 
+        }
+
         return buff;
     }
 }
@@ -239,8 +365,9 @@ void setTextNormal() {
 
 void printMenu() {
     clearConsole();
+    printf("*********************************************************\n");
     printf("커서를 선택할 메뉴로 이동한 뒤 엔터를 누르세요\n\n");
-    printf("***********************************\n");
+    printf("*********************************************************\n");
     int countOfMenu = sizeof(MENU) / sizeof(MENU[0]);
     for (int i = 0; i < countOfMenu; i++) {
         if (cursorPos.y - NO_OF_TITLE_LINE == i) setTextHighlight();
@@ -291,4 +418,89 @@ bool addReservedItem(_ITEM* item) {
     return true;
 }
 
+// 실제적으로 reservedItem에서 해당 항목 제거,  메모리는  5의 배수 만큼 확보해 놓음
+// delete no는 0부터 시작
+bool removeFromReservedItem(int deleteNo) {
+    if (deleteNo < 0 || deleteNo >= countOfItems) {
+        printf("Error!!! removeFromReservedItem = 잘못된  index를 사용\n");
+        return false;
+    }
+
+    // 새롭게 저장할 포인터
+    _ITEM* tempItems;
+    
+    // 하나 뺐을 때의  필요 item  카운트수 를 구하고
+    int requirdCount = ( (countOfItems-1)/5  + 1 ) * 5 ; // 원래 1-5  하나빼면 0-4 5개 확보,   원래 6-10 하나빼면 5-9 10개 확보
+    
+    // 메모리 확보
+    tempItems = (_ITEM*)malloc( requirdCount * sizeof(_ITEM));
+    if (tempItems == NULL) {
+        printf("Error!!! removeFromReservedItem = 메모리 확보 실패\n");
+        return false;
+    }
+
+    // for loop를 돌면서 지울 항목을 제외하고는 복사
+    int savePosition = 0;
+    for (int i = 0; i < countOfItems; i++) {
+        // 지울 항목이면 pass
+        if (i == deleteNo) continue;
+        // 아니면  
+        tempItems[savePosition] = reservedItem[i];
+        savePosition++;
+    }
+
+    // 성공했으면 count  하나 빼줌
+    countOfItems--;
+
+    // 메모리를 해제하고 tempItems로 교체
+    free(reservedItem);
+    reservedItem = tempItems;
+
+    return true;
+}
+
+
+bool modifyReservedItem(int select) {
+    clearConsole();
+
+    printf("\n------------------------------------------------------------------------------------------------\n");
+    printf("% -20s % -5s % -30s % -30s\n", "   품목 이름", "갯수", "입고날자", "유통기한");
+    printf("------------------------------------------------------------------------------------------------\n");
+
+    char* start_date = getFormatedStringByTime_t(&reservedItem[select].start_date);
+    char* expire_date = getFormatedStringByTime_t(&reservedItem[select].expire_date);
+    printf("%-20s  %3d개  %-30s  %-30s\n", reservedItem[select].name, reservedItem[select].count, start_date, expire_date);
+    free(start_date);
+    free(expire_date);
+
+    printf("------------------------------------------------------------------------------------------------\n");
+
+    char selectOption;
+    
+    int retry = 0;
+    while (true) {
+        printf("\n새로 입력할 항목에 따라 단축기를 누르세요 : 품목이름-p,   갯수-c,  입고날자-s, 유통기한-m, 종료-e >> ");
+        if (retry == 3) {
+            printf("\nWarning!!! 3번 이상 잘 못 입력하셨습니다\n");
+            _getch();
+            return true;
+        }
+
+        selectOption = _getch();
+        switch (selectOption) {
+        case 'p': retry = 0;  break;
+        case 'c': retry = 0;  break;
+        case 's': retry = 0; break;
+        case 'm': retry = 0;  break;
+        case 'e' :
+            return true;
+        default : 
+            retry++;
+            continue;
+        }
+    }
+
+    return true;
+
+}
 
