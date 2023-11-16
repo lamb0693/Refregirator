@@ -153,7 +153,8 @@ bool doAddNewItem() {
     _ITEM newItem;
     clearConsole();
     printf("보관할 새로운 정보를 입력합니다 \n\n");
-    printf("품목 이름 : (20자이내) >> ");
+    // char name[20] '\0' 를 위해 19자만 입력 가능
+    printf("품목 이름 : (19자이내) >> ");
     scanf_s("%s", newItem.name, (unsigned)_countof(newItem.name));
     printf("품목 갯수 >> ");
     scanf_s("%d", &newItem.count );
@@ -246,6 +247,12 @@ bool doModifyItem() {
     clearConsole();
     printReservedItem();
 
+    if (countOfItems == 0) {
+        printf("\n 저장된 품목이 없습니다 되돌아가시려면 아무 키나 누르세요 >>");
+        _getch();
+        return true;
+    }
+
     int select;
     int countOfTry = 0;
 
@@ -267,7 +274,7 @@ bool doModifyItem() {
         break;
     }
 
-    printf("\n 수정할 항목이  [[ %d ]]  맞으면 y,  아니라면  n 을 입력", select);
+    printf("\n 수정할 항목이  [[ %d ]]  맞으면 y,  아니라면  n 을 입력 >>", select);
     while (true) {
         char answer = _getch();
         if (answer == 'y') {
@@ -461,36 +468,56 @@ bool removeFromReservedItem(int deleteNo) {
 
 
 bool modifyReservedItem(int select) {
-    clearConsole();
-
-    printf("\n------------------------------------------------------------------------------------------------\n");
-    printf("% -20s % -5s % -30s % -30s\n", "   품목 이름", "갯수", "입고날자", "유통기한");
-    printf("------------------------------------------------------------------------------------------------\n");
-
-    char* start_date = getFormatedStringByTime_t(&reservedItem[select].start_date);
-    char* expire_date = getFormatedStringByTime_t(&reservedItem[select].expire_date);
-    printf("%-20s  %3d개  %-30s  %-30s\n", reservedItem[select].name, reservedItem[select].count, start_date, expire_date);
-    free(start_date);
-    free(expire_date);
-
-    printf("------------------------------------------------------------------------------------------------\n");
-
-    char selectOption;
     
     int retry = 0;
+    char selectOption;
+
     while (true) {
-        printf("\n새로 입력할 항목에 따라 단축기를 누르세요 : 품목이름-p,   갯수-c,  입고날자-s, 유통기한-m, 종료-e >> ");
+        clearConsole();
+
+        printf("\n------------------------------------------------------------------------------------------------\n");
+        printf("% -20s % -5s % -30s % -30s\n", "   품목 이름", "갯수", "입고날자", "유통기한");
+        printf("------------------------------------------------------------------------------------------------\n");
+
+        char* start_date = getFormatedStringByTime_t(&reservedItem[select].start_date);
+        char* expire_date = getFormatedStringByTime_t(&reservedItem[select].expire_date);
+        printf("%-20s  %3d개  %-30s  %-30s\n", reservedItem[select].name, reservedItem[select].count, start_date, expire_date);
+        free(start_date);
+        free(expire_date);
+
+        printf("------------------------------------------------------------------------------------------------\n");
+
+        printf("\n수정할 항목에 따라 단축기를 누르세요 : 품목이름-p,   갯수-c,  입고날자-s, 유통기한-m, 종료-e >> ");
         if (retry == 3) {
             printf("\nWarning!!! 3번 이상 잘 못 입력하셨습니다\n");
             _getch();
             return true;
         }
 
+
         selectOption = _getch();
         switch (selectOption) {
-        case 'p': retry = 0;  break;
-        case 'c': retry = 0;  break;
+        case 'p':
+            char newName[20];
+            printf("\n품목의 이름을   입력 하세요 19자 이하>> ");
+            scanf_s("%19s", newName, (unsigned)_countof(newName));
+            strcpy_s( reservedItem[select].name, newName);
+            retry = 0;
+            break;
+        case 'c': 
+            int newCount;
+            printf("\n품목의 갯수를    입력 하세요 >> ");
+            scanf_s("%d", &newCount);
+            reservedItem->count = newCount;
+            retry = 0;
+            break;
         case 's': retry = 0; break;
+            int newCount;
+            printf("\n새로운 입고 날자를    입력 하세요 >> ");
+            scanf_s("%d", &newCount);
+            reservedItem->count = newCount;
+            retry = 0;
+            break;
         case 'm': retry = 0;  break;
         case 'e' :
             return true;
@@ -504,3 +531,38 @@ bool modifyReservedItem(int select) {
 
 }
 
+// console로 부터 time_t구조를 입력 받아  return
+time_t inputDateFromConsole(const char* message ) {
+    // 기본 tm 구조 선언
+    struct tm inputTime = { 0 };
+    time_t retTime_t;
+
+    //  data  입력
+    printf("%s을(를) 다음 형식과 같이 입력하세요 (YYYY-MM-DD) >> ");
+    int retry = 0;
+    while (true) {
+        if (retry == 3) {
+            printf("\n 3회 이상 입력에 실패 했습니다, 아무키나 누르시면 되돌아 갑니다");
+            _getch();
+            return -1;
+        }
+        else if (scanf_s("%d-%d-%d", &inputTime.tm_year, &inputTime.tm_mon, &inputTime.tm_mday) != 3) {
+            printf("정확한 날짜 정보를 입력하세요 e.g 2023-11-14 Error %d회\n", retry);
+            retry++;
+            while (getchar() != '\n'); // input buffer를 비운다
+            continue;
+        }
+        else {
+            inputTime.tm_year -= 1900;
+            inputTime.tm_mon--;
+            retTime_t = mktime(&inputTime);
+            if (retTime_t == -1) {
+                printf("입력하신 날자가 유효한 날자가 아닙니다.  다시 입력하세요\n");
+                retry++;
+                continue;
+            } else {
+                return retTime_t;
+            }
+        }
+    }
+}
