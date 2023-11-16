@@ -9,20 +9,7 @@
 
 #define ARROW_DOWN 80
 #define ARROW_UP 72
-#define CURSOR_LIMIT_UP 4  // MENU 화면에서 CURSOR가 올라 갈 수 있는 한계
-#define CURSOR_LIMINT_DOWN 10  // MENU 화면에서 CURSOR가 내려 갈 수 있는 한계
-#define NO_OF_TITLE_LINE 4  // MENU화면에서 위의 빈줄 수
-
-/* 참고
-*  CONSOLE_SCRREN_BUFFER_INFO 구조
-typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
-    COORD      dwSize;
-    COORD      dwCursorPosition;
-    WORD       wAttributes;
-    SMALL_RECT srWindow;
-    COORD      dwMaximumWindowSize;
-} CONSOLE_SCREEN_BUFFER_INFO;
-*/
+#define COUNT_OF_MAIN_MENU 7
 
 // 보관 물품 항목에 대한 구조체
 typedef struct {
@@ -37,6 +24,23 @@ typedef struct  {
     int x;
     int y;
 } _CURSOR_POS;
+
+// main menu의 cursor 위치를 저장할 변수
+_CURSOR_POS menuPosition[COUNT_OF_MAIN_MENU];
+
+// main menu의 enum 상수
+enum MENU_ITEM {
+    CURRENT_STATUS, REMOVE_FOOD, NEW_FOOD, MODIFY_ITEM, READ_FROM_FILE, WRITE_TO_FILE, EXIT
+};
+// 현재  select 된 main menu
+enum MENU_ITEM selectedMenu = CURRENT_STATUS;
+
+// 냉장고 상태보기 내에서 사용되는 enum 상수
+enum STATUS_BUTTON_MENU {
+    RECIPE, REF_TEMP_UP, REF_TEMP_DOWN, FRE_TEMP_UP, FRE_TEMP_DOWN, PREVIOUS
+};
+
+
 
 // data를 저장할 파일 이름
 const char* strFileName = "refregirator.rfr";
@@ -57,6 +61,7 @@ void doAction(int option);
 
 // 현재 _ITEM* 보여주기
 void doListItems();
+void printRefregiratorStatus(_CURSOR_POS buttonPos[6], enum STATUS_BUTTON_MENU currentSelection);
 
 // _ITEM 항목 삭제 
 // // _ITEM 갯수가 5의 배수로 되면 남아있는 메모리 제거후 다시 메모리 획득기능 포함
@@ -78,23 +83,27 @@ bool doSaveToFile();
 
 // 위의 함수를 보조하기 위한  함수
 bool printReservedItem();  // 현재 지정된 항목을 list하기 위한 함수
-char* getFormatedStringByTime_t(time_t* ttCurrent);  // time_t에서  날짜 스트링으로 변환
+char* getFormatedStringByTime_t(time_t* ttCurrent);  // time_t에서  날짜 스트링으로 변환 실행측에서 memory해제해야 함
 time_t inputDateFromConsole(const char* message);  // time_t 구조를 입력 받기 위한 함수
+void setTextHighlight();
+void setTextNormal();
 
 
 // 기본 화면에 표시할 메뉴 문자열
 const char* MENU[] = {
-    "1 >> Display Current Foods\n",
-    "2 >> Remove Food\n",
-    "3 >> New Food\n",
-    "4 >> Modify Item\n",
-    "5 >> File에서 불러오기\n",
-    "6 >> File에 현상태 저장하기\n",
-    "7 >> Exit\n"
+    "0 >> 현재 상황 및 음식 출력\n",
+    "1 >> Remove Food\n",
+    "2 >> New Food\n",
+    "3 >> Modify Item\n",
+    "4 >> File에서 불러오기\n",
+    "5 >> File에 현상태 저장하기\n",
+    "6 >> Exit\n"
 };
 
+
+
 // 현재 cursor의 위치
-_CURSOR_POS cursorPos = { 0.0 };
+//_CURSOR_POS cursorPos = { 0.0 };
 
 // 현재 냉장고 보관 물품 목록
 _ITEM* reservedItem;
@@ -103,32 +112,33 @@ _ITEM* reservedItem;
 //reservedItem과 항상 동기를 정확히 시켜주어야 함
 int countOfItems = 0;
 
+// 냉장고 온도
+int refregiratorTemperature = 5;
+int freezerTemperature = -5;
+
 
 int main()
 {
     initializedMemroyForReservedItem();
 
-
-    cursorPos = { 0, NO_OF_TITLE_LINE };
     printMenu();
 
-  
-    char arrow;
+    char arrow; // arrow를 누르면 224, ARROW_DOWN, ARROW_UP 값이 순차적으로 들어 옴
 
     while (true) {
         switch (_getch()) {
-        case 224 : 
+        case 224 : //특수 키면 ArrowUp인지 ArrowDown인지 확인
             arrow = _getch();
             if (arrow == ARROW_DOWN) {
-                if(cursorPos.y < CURSOR_LIMINT_DOWN) cursorPos.y++;
+                if(selectedMenu < COUNT_OF_MAIN_MENU-1) selectedMenu = (enum MENU_ITEM)(selectedMenu + 1);
             }
             else if (arrow == ARROW_UP) {
-                if (cursorPos.y > CURSOR_LIMIT_UP) cursorPos.y--;
+                if (selectedMenu >0 ) selectedMenu = (enum MENU_ITEM)(selectedMenu - 1);
             }
             break;
 
-        case '\r' :
-            doAction(cursorPos.y);
+        case '\r' :  // Enter key가 눌려지면 실제 행동을 한다
+            doAction(selectedMenu);
         default :
             break;
         }
@@ -136,29 +146,43 @@ int main()
     }
 }
 
+void printMenu() {
+    clearConsole();
+    printf("*********************************************************\n");
+    printf("커서를 선택할 메뉴로 이동한 뒤 엔터를 누르세요\n\n");
+    printf("*********************************************************\n");
+    int countOfMenu = sizeof(MENU) / sizeof(MENU[0]);
+    for (int i = 0; i < countOfMenu; i++) {
+        if (selectedMenu == i) setTextHighlight();
+        printf("%s", MENU[i]);
+        setTextNormal();
+    }
+    printf("***********************************\n");
+}
+
 // 메뉴의 키가 선택되면 해당 함수를 호출
 void doAction(int option) {
-    //printf("Enter key was clicked in row %d", option);
+
     switch (option) {
-    case NO_OF_TITLE_LINE : 
+    case CURRENT_STATUS:   //첫째 줄
         doListItems();
         break;
-    case NO_OF_TITLE_LINE+1:
+    case REMOVE_FOOD:  // 둘째 줄
         doDeleteItem();
         break;
-    case NO_OF_TITLE_LINE+2:
+    case NEW_FOOD:
         if (doAddNewItem() == false) { printf("Error !!! doAddNewItem()"); exit(1); };
         break;
-    case NO_OF_TITLE_LINE+3:
+    case MODIFY_ITEM:
         if(doModifyItem() == false ) { printf("Error !!! doModifyItem()"); exit(1); }
         break;
-    case NO_OF_TITLE_LINE + 4:
+    case READ_FROM_FILE:
         if (doReadFromFile() == false) { printf("Error !!! doReadFromFile()"); exit(1); }
         break;
-    case NO_OF_TITLE_LINE + 5:
+    case WRITE_TO_FILE:
         if (doSaveToFile() == false) { printf("Error !!! doSaveToFile()"); exit(1); }
         break;
-    case NO_OF_TITLE_LINE+6: 
+    case EXIT:
         exit(0);
     default:break;
     }
@@ -166,16 +190,132 @@ void doAction(int option) {
 
 // 전체 항목을 표시해 주는 역할
 void doListItems() {
+    // 가상 버튼 6개
+    _CURSOR_POS buttonPos[6];
+
+    // 현재 선택된 메뉴 설정
+    enum STATUS_BUTTON_MENU currentSelection = PREVIOUS;
+ 
+    //  화살표 키 입력을 받을 변수
+    int arrow;
+
+    // 현상태를 인쇄
+    printRefregiratorStatus(buttonPos, currentSelection);
+
+    bool completed = false;
+    while (!completed) {
+        switch (_getch()) {
+        case 224: //특수 키면 ArrowUp인지 ArrowDown인지 확인
+            arrow = _getch();
+            if (arrow == ARROW_DOWN) {
+                if (currentSelection <5) currentSelection = (enum STATUS_BUTTON_MENU)(currentSelection+1);
+            }
+            else if (arrow == ARROW_UP) {
+                if (currentSelection > 0) currentSelection = (enum STATUS_BUTTON_MENU)(currentSelection - 1);
+            }
+            break;
+
+        case '\r':  // Enter key가 눌려지면 실제 행동을 한다
+            switch (currentSelection) {
+            case RECIPE:
+                break;
+            case REF_TEMP_UP:
+                refregiratorTemperature++;
+                break;
+            case REF_TEMP_DOWN:
+                refregiratorTemperature--;
+                break;
+            case FRE_TEMP_UP:
+                freezerTemperature++;
+                break;
+            case FRE_TEMP_DOWN:
+                freezerTemperature--;
+                break;
+            case PREVIOUS:
+                completed = true;
+                break;
+            default:
+                break;
+            }
+        }
+        printRefregiratorStatus(buttonPos, currentSelection);
+    }
+
+}
+
+void printRefregiratorStatus(_CURSOR_POS buttonPos[6] ,enum STATUS_BUTTON_MENU currentSelection) {
     clearConsole();
+
+    // 현재 시간
+    time_t currentTime_t;
+    time(&currentTime_t);
+
+    printf("-------------------------------------------------------------------");
+    printf("\n냉장고 관리 시스템");
+    char* strCurrentTime = getFormatedStringByTime_t(&currentTime_t);
+    printf("\n%s", strCurrentTime);
+    free(strCurrentTime);
+
+    printf("\n-------------------------------------------------------------------");
+    printf("\n유통기한 임박");
+    for (int i = 0; i < countOfItems; i++) {
+        if (reservedItem[i].expire_date < currentTime_t) printf("\n%20s 가 유통기한이 경과하였습니다", reservedItem[i].name);
+        else if (difftime(reservedItem[i].expire_date, currentTime_t) < 60 * 60 * 24) printf("\n%20s가 유통기한이 하루 이하입니다", reservedItem[i].name);
+    }
+
+    printf("\n-------------------------------------------------------------------");
+    printf("\n지금 만들 수 있는 메뉴\n");
+    getCursorPosition(&buttonPos[RECIPE]);
+    if (currentSelection == RECIPE) setTextHighlight();
+    printf("[레시피 관리]");
+    setTextNormal();
+
+    printf("\n-------------------------------------------------------------------");
+    printf("\n냉장실(%3d도)", refregiratorTemperature);
+    
+    getCursorPosition(&buttonPos[REF_TEMP_UP]);
+    if (currentSelection == REF_TEMP_UP) setTextHighlight();
+    printf(" [온도올리기] ");
+    setTextNormal();
+
+    getCursorPosition(&buttonPos[REF_TEMP_DOWN]);
+    if (currentSelection == REF_TEMP_DOWN) setTextHighlight();
+    printf(" [온도내리기] ");
+    setTextNormal();
+
+    if (refregiratorTemperature < 0)  printf("  냉장실 온도가 너무 낮습니다");
+    if (refregiratorTemperature > 4) printf("  냉장실 온도가 너무 높습니다");
+
+    printf("\n냉동실(%3d도)", freezerTemperature);
+
+    getCursorPosition(&buttonPos[FRE_TEMP_UP]);
+    if (currentSelection == FRE_TEMP_UP) setTextHighlight();
+    printf(" [온도올리기] ");
+    setTextNormal();
+
+    getCursorPosition(&buttonPos[FRE_TEMP_DOWN]);
+    if (currentSelection == FRE_TEMP_DOWN) setTextHighlight();
+    printf(" [온도내리기] ");
+    setTextNormal();
+
+    if (refregiratorTemperature < -20) printf("  냉장실 온도가 너무 낮습니다");
+    if (freezerTemperature > -10) printf("  냉동실 온도가 너무 높습니다");
+
     printReservedItem();
 
-    printf("확인 하셨으면 y 키를 누르세요 >>");
-    while (_getch() != 'y') {};
+    getCursorPosition(&buttonPos[PREVIOUS]);
+    if (currentSelection == PREVIOUS) setTextHighlight();
+    if(buttonPos) printf("[이전화면으로]\n");
+    setTextNormal();
+
+    printf("\n위 아래 화살표 키로 커서를 선택할 메뉴로 이동한 뒤 엔터를 누르세요\n");
 }
 
 // 새로운 항목을 추가 해 줌 - 실제 기능은 addReservedItem() 함수가 시행
+// data 무결성에 영향을 미치면 false를  return, 아니면 true를 return
 bool doAddNewItem() {
     _ITEM newItem;
+
     clearConsole();
     printf("보관할 새로운 정보를 입력합니다 \n\n");
     // char name[20] '\0' 를 위해 19자만 입력 가능
@@ -198,7 +338,7 @@ bool doAddNewItem() {
         return true;
     }
     
-    // 입력 받는 날자를 출력
+    // 입력 받은 날자를 출력
     newItem.expire_date = inputDate;
     char* expDate = getFormatedStringByTime_t(&newItem.expire_date);
     printf("입력한 Expire date : %s\n", expDate);
@@ -213,6 +353,7 @@ bool doAddNewItem() {
     return true;
 }
 
+// data 무결성에 영향을 미치면 false를  return, 아니면 true를 return
 bool doDeleteItem() {
     clearConsole();
     printf("*****************************************\n");
@@ -225,7 +366,10 @@ bool doDeleteItem() {
     int countOfTry = 0;
 
     while (true) {
-        if (countOfTry == 3) break;
+        if (countOfTry == 3) {
+            printf("\n3번 이상 입력에 실패했습니다, 삭제 실패, 아무키나 누르시면 돌아 갑니다");
+            return true;
+        }
 
         printf("\n지울 아이템의  번호를 입력하세요 >> ");
         if (scanf_s("%d", &select) == 0) {
@@ -256,6 +400,7 @@ bool doDeleteItem() {
     return true;
 }
 
+// data 무결성에 영향을 미치면 false를  return, 아니면 true를 return
 bool doModifyItem() {
     clearConsole();
     printReservedItem();
@@ -320,6 +465,7 @@ bool printReservedItem() {
 
 // time_t => YYYY-MM-DD 로 변환
 // caller가 buff를 free 해 주어야 한다
+// 실패하면 NULL을 return
 char* getFormatedStringByTime_t(time_t* ttCurrent) {
     struct tm localTM;
     localtime_s(&localTM, ttCurrent);
@@ -349,7 +495,7 @@ char* getFormatedStringByTime_t(time_t* ttCurrent) {
     }
 }
 
-
+// 실패하면 false 를 retuen
 bool getCursorPosition(_CURSOR_POS* cursor_pos) {
     CONSOLE_SCREEN_BUFFER_INFO presentCur;
 
@@ -360,11 +506,13 @@ bool getCursorPosition(_CURSOR_POS* cursor_pos) {
     else {
         cursor_pos->x = presentCur.dwCursorPosition.X;
         cursor_pos->y = presentCur.dwCursorPosition.Y;
-        printf("current cursor position  = %d, %d\n",cursor_pos->x, cursor_pos->y);
-        return false;
+        //printf("current cursor position  = %d, %d\n",cursor_pos->x, cursor_pos->y);
+        return true;
     }
 }
 
+
+// 실패하면 false 를 retuen
 bool setCursorPosition(_CURSOR_POS* cursor_pos) {
     COORD newPosition = { (SHORT)cursor_pos->x, (SHORT)cursor_pos->y };
     if (SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), newPosition) == 0) {
@@ -376,6 +524,7 @@ bool setCursorPosition(_CURSOR_POS* cursor_pos) {
     }
 }
 
+// 실패하면 false 를 retuen
 bool clearConsole() {
     if (system("cls")) return true;
     else return false;
@@ -389,25 +538,8 @@ void setTextNormal() {
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
 }
 
-
-
-void printMenu() {
-    clearConsole();
-    printf("*********************************************************\n");
-    printf("커서를 선택할 메뉴로 이동한 뒤 엔터를 누르세요\n\n");
-    printf("*********************************************************\n");
-    int countOfMenu = sizeof(MENU) / sizeof(MENU[0]);
-    for (int i = 0; i < countOfMenu; i++) {
-        if (cursorPos.y - NO_OF_TITLE_LINE == i) setTextHighlight();
-        else setTextNormal();
-        printf("%s", MENU[i]);
-    }
-    setTextNormal();
-    printf("***********************************\n");
-    setCursorPosition(&cursorPos);
-}
-
 // 일단 처음에 5개 영역 확보
+// 실패하면 false 를 retuen
 bool initializedMemroyForReservedItem() {
 
     reservedItem = (_ITEM*) malloc(5 * sizeof(_ITEM));
@@ -424,6 +556,7 @@ bool initializedMemroyForReservedItem() {
 // 메모리가 남아있으면 item add
 // 메모리가 모자라면 새로 allocation 후 대입
 // copy를 하믈 *item은 메모리를 유지할 필요가 없다.
+// 실패하면 false 를 retuen
 bool addReservedItem(_ITEM* item) {
     // 메모리가 모자라면 새로운 memory를 확보 후 이전 데이터를 복사하고 현재 내용을 덧 붙임
     _ITEM* tempItems;
@@ -448,6 +581,7 @@ bool addReservedItem(_ITEM* item) {
 
 // 실제적으로 reservedItem에서 해당 항목 제거,  메모리는  5의 배수 만큼 확보해 놓음
 // delete no는 0부터 시작
+// data 무결성에 영향을 미치면 false를  return, 아니면 true를 return
 bool removeFromReservedItem(int deleteNo) {
     if (deleteNo < 0 || deleteNo >= countOfItems) {
         printf("Error!!! removeFromReservedItem = 잘못된  index를 사용\n");
@@ -487,7 +621,7 @@ bool removeFromReservedItem(int deleteNo) {
     return true;
 }
 
-
+// data 무결성에 영향을 미치면 false를  return, 아니면 true를 return
 bool modifyReservedItem(int select) {
     
     int retry = 0;
@@ -531,21 +665,21 @@ bool modifyReservedItem(int select) {
             int newCount;
             printf("\n품목의 갯수를    입력 하세요 >> ");
             scanf_s("%d", &newCount);
-            reservedItem->count = newCount;
+            reservedItem[select].count = newCount;
             retry = 0;
             break;
         case 's': 
             time_t newStartDate;
             newStartDate = inputDateFromConsole("새로운 입고 날자");
             if (newStartDate == -1) printf("\n날자 입력에 실패하셧어요, 다시 시도 하세요");
-            else reservedItem->start_date = newStartDate;
+            else reservedItem[select].start_date = newStartDate;
             retry = 0;
             break;
         case 'e':
             time_t newExpireDate;
             newExpireDate = inputDateFromConsole("새로운 유통 기한");
             if (newExpireDate == -1) printf("\n날자 입력에 실패하셧어요, 다시 시도 하세요");
-            else reservedItem->expire_date = newExpireDate;
+            else reservedItem[select].expire_date = newExpireDate;
             retry = 0;
             break;
         case 'q' :
@@ -561,6 +695,7 @@ bool modifyReservedItem(int select) {
 }
 
 // console로 부터 time_t구조를 입력 받아 검정 받은 후 return
+// 실패하면 -1을 return
 time_t inputDateFromConsole(const char* message ) {
     // 기본 tm 구조 선언
     struct tm inputTime = { 0 };
@@ -597,6 +732,7 @@ time_t inputDateFromConsole(const char* message ) {
 }
 
 // 파일에 _ITEM* 저장
+// 실패하면 message 보여주고 false를  return
 bool doSaveToFile() {
     clearConsole();
     printf("---------------------------------------------\n");
@@ -641,6 +777,7 @@ bool doSaveToFile() {
 
 // 파일에서 불러오기
 // 쓸때 차지한  data를 잘 생각해서 복원
+// 실패하면 message 보여주고 false를  return
 bool doReadFromFile() {
     clearConsole();
     printf("---------------------------------------------\n");
