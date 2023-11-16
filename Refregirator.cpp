@@ -38,9 +38,10 @@ typedef struct  {
     int y;
 } _CURSOR_POS;
 
+// data를 저장할 파일 이름
 const char* strFileName = "refregirator.rfr";
 
-
+// console의 cursor 관련 함수
 bool getCursorPosition(_CURSOR_POS* cursor_pos);
 bool setCursorPosition(_CURSOR_POS* cursor_pos);
 bool clearConsole();
@@ -48,27 +49,37 @@ bool clearConsole();
 // 시작하면서 _ITEM* 5개에 대한 memory 확보
 bool initializedMemroyForReservedItem();
 
+// 기본 메뉴 표시 화면
 void printMenu();
+
+// option에 따른  함수의 분기 지정
 void doAction(int option);
+
+// 현재 _ITEM* 보여주기
 void doListItems();
-// _ITEM 갯수가 5의 배수로 되면 남아있는 메모리 제거후 다시 메모리 획득기능 포함
+
+// _ITEM 항목 삭제 
+// // _ITEM 갯수가 5의 배수로 되면 남아있는 메모리 제거후 다시 메모리 획득기능 포함
 bool doDeleteItem(); // remove 기본 작업
 bool removeFromReservedItem(int itemNo); // 실제 remove 기능
+
+// 새로운 아이템 추가
 // 새로운 아이템을 추가할 시 _ITEM 에 대한 메모리 모자라면 추가하는 기능 포함
 bool doAddNewItem(); // add 기본 작업
 bool addReservedItem(_ITEM* item); // 실제 add 기능
+
 // 저장된 아이템을 수정하는 기능
 bool doModifyItem(); // 수정 기본 작업
 bool modifyReservedItem(int select); // 실제 수정 기능
-// 저장된 file에서 불러 오기
+
+// 저장된 file에서 불러 오기 및 쓰기
 bool doReadFromFile();
-// file에 현재 data  쓰기
 bool doSaveToFile();
 
 // 위의 함수를 보조하기 위한  함수
-bool printReservedItem();
-char* getFormatedStringByTime_t(time_t* ttCurrent);
-time_t inputDateFromConsole(const char* message);
+bool printReservedItem();  // 현재 지정된 항목을 list하기 위한 함수
+char* getFormatedStringByTime_t(time_t* ttCurrent);  // time_t에서  날짜 스트링으로 변환
+time_t inputDateFromConsole(const char* message);  // time_t 구조를 입력 받기 위한 함수
 
 
 // 기본 화면에 표시할 메뉴 문자열
@@ -313,9 +324,20 @@ char* getFormatedStringByTime_t(time_t* ttCurrent) {
     struct tm localTM;
     localtime_s(&localTM, ttCurrent);
     char* buff = (char*)malloc(sizeof(char)*256) ;
-    if (buff == 0) { printf("Error getFormatedStringByTime_t\n"); exit(1); }
+
+    if (buff == 0) {
+        printf("Memory allocation error in getFormatedStringByTime_t,  아무키나 입력하세요\n");
+        _getch();
+        return NULL;
+    }
     else {
-        asctime_s(buff, sizeof(char) * 256, &localTM);
+
+        if (strftime(buff, sizeof(char)*256, "%Y년 %m월 %d일", &localTM) == 0) {
+            printf("time_t를 문자열로 변경하는데 실패했습니다, 아무 키나 입력하세요 \n");
+            _getch();
+            free(buff);
+            return NULL;
+        }
 
         // 끝에 포함된 \n을 없앤다.
         size_t length = strlen(buff);
