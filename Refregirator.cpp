@@ -13,7 +13,7 @@
 #define CURSOR_LIMINT_DOWN 8  // MENU 화면에서 CURSOR가 내려 갈 수 있는 한계
 #define NO_OF_TITLE_LINE 4  // MENU화면에서 위의 빈줄 수
 
-/*
+/* 참고
 *  CONSOLE_SCRREN_BUFFER_INFO 구조
 typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
     COORD      dwSize;
@@ -62,6 +62,7 @@ bool modifyReservedItem(int select); // 실제 수정 기능
 // 위의 함수를 보조하기 위한  함수
 bool printReservedItem();
 char* getFormatedStringByTime_t(time_t* ttCurrent);
+time_t inputDateFromConsole(const char* message);
 
 
 // 기본 화면에 표시할 메뉴 문자열
@@ -165,30 +166,21 @@ bool doAddNewItem() {
     printf("입고 날자 : %s", startDate);
     free(startDate);
 
-    // 유통기한 입력하기
-    struct tm inputTime = { 0 };
-    printf("유통기한 입력을 입력한다 (YYYY-MM-DD) >> ");
-    int retry = 0;
-    while(scanf_s("%d-%d-%d",  &inputTime.tm_year, &inputTime.tm_mon, &inputTime.tm_mday) != 3) {
-        retry++;
-        if (retry == 3) return false;
-        printf("정확한 날자 정보를 입력하세요 e.g 2023-11-14 Error %d회\n", retry); 
+    // 날짜를 console 에서 입력 받는다
+    time_t inputDate = inputDateFromConsole("유통기한");
+    if (inputDate == -1) {
+        printf("\n 날자 입력에 실패 하였습니다, 아무 키나 누르시면 돌아갑니다");
+        _getch();
+        return true;
     }
+    
+    // 입력 받는 날자를 출력
+    newItem.expire_date = inputDate;
+    char* expDate = getFormatedStringByTime_t(&newItem.expire_date);
+    printf("입력한 Expire date : %s\n", expDate);
+    free(expDate);
 
-    // 입력한 날자 형식이 문제가 없는지 확인 없으면 출력한다
-    inputTime.tm_year -= 1900; 
-    inputTime.tm_mon--;        
-    newItem.expire_date = mktime(&inputTime);
-    if (newItem.expire_date == -1) {
-        printf("Invalid date and time.  \n");
-        return false;
-    }
-    else {
-        char* expDate = getFormatedStringByTime_t(&newItem.expire_date);
-        printf("입력한 Expire date : %s\n", expDate);
-        free(expDate);
-    }
-
+    // 실제로 data를 reservedItem 에 저장 시도
     if (addReservedItem(&newItem) == false) { printf("Error!!! fail to add ReservedItem()"); exit(0); }
 
     printf("\n확인 하셨으면 y 키를 누르세요 >>");
@@ -487,7 +479,7 @@ bool modifyReservedItem(int select) {
 
         printf("------------------------------------------------------------------------------------------------\n");
 
-        printf("\n수정할 항목에 따라 단축기를 누르세요 : 품목이름-p,   갯수-c,  입고날자-s, 유통기한-m, 종료-e >> ");
+        printf("\n수정할 항목에 따라 단축기를 누르세요 : 품목이름-p,   갯수-c,  입고날자-s, 유통기한-e, 종료-q >> ");
         if (retry == 3) {
             printf("\nWarning!!! 3번 이상 잘 못 입력하셨습니다\n");
             _getch();
@@ -511,15 +503,21 @@ bool modifyReservedItem(int select) {
             reservedItem->count = newCount;
             retry = 0;
             break;
-        case 's': retry = 0; break;
-            int newCount;
-            printf("\n새로운 입고 날자를    입력 하세요 >> ");
-            scanf_s("%d", &newCount);
-            reservedItem->count = newCount;
+        case 's': 
+            time_t newStartDate;
+            newStartDate = inputDateFromConsole("새로운 입고 날자");
+            if (newStartDate == -1) printf("\n날자 입력에 실패하셧어요, 다시 시도 하세요");
+            else reservedItem->start_date = newStartDate;
             retry = 0;
             break;
-        case 'm': retry = 0;  break;
-        case 'e' :
+        case 'e':
+            time_t newExpireDate;
+            newExpireDate = inputDateFromConsole("새로운 입고 날자");
+            if (newExpireDate == -1) printf("\n날자 입력에 실패하셧어요, 다시 시도 하세요");
+            else reservedItem->expire_date = newExpireDate;
+            retry = 0;
+            break;
+        case 'q' :
             return true;
         default : 
             retry++;
@@ -531,14 +529,14 @@ bool modifyReservedItem(int select) {
 
 }
 
-// console로 부터 time_t구조를 입력 받아  return
+// console로 부터 time_t구조를 입력 받아 검정 받은 후 return
 time_t inputDateFromConsole(const char* message ) {
     // 기본 tm 구조 선언
     struct tm inputTime = { 0 };
     time_t retTime_t;
 
     //  data  입력
-    printf("%s을(를) 다음 형식과 같이 입력하세요 (YYYY-MM-DD) >> ");
+    printf("\n%s을(를) 다음 형식과 같이 입력하세요 (YYYY-MM-DD) >> ", message);
     int retry = 0;
     while (true) {
         if (retry == 3) {
@@ -547,7 +545,7 @@ time_t inputDateFromConsole(const char* message ) {
             return -1;
         }
         else if (scanf_s("%d-%d-%d", &inputTime.tm_year, &inputTime.tm_mon, &inputTime.tm_mday) != 3) {
-            printf("정확한 날짜 정보를 입력하세요 e.g 2023-11-14 Error %d회\n", retry);
+            printf("\n정확한 날짜 정보를 입력하세요 e.g 2023-11-14 Error %d회\n", retry);
             retry++;
             while (getchar() != '\n'); // input buffer를 비운다
             continue;
@@ -557,7 +555,7 @@ time_t inputDateFromConsole(const char* message ) {
             inputTime.tm_mon--;
             retTime_t = mktime(&inputTime);
             if (retTime_t == -1) {
-                printf("입력하신 날자가 유효한 날자가 아닙니다.  다시 입력하세요\n");
+                printf("\n입력하신 날자가 유효한 날자가 아닙니다.  다시 입력하세요\n");
                 retry++;
                 continue;
             } else {
