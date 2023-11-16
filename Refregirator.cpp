@@ -40,8 +40,6 @@ enum STATUS_BUTTON_MENU {
     RECIPE, REF_TEMP_UP, REF_TEMP_DOWN, FRE_TEMP_UP, FRE_TEMP_DOWN, PREVIOUS
 };
 
-
-
 // data를 저장할 파일 이름
 const char* strFileName = "refregirator.rfr";
 
@@ -61,7 +59,7 @@ void doAction(int option);
 
 // 현재 _ITEM* 보여주기
 void doListItems();
-void printRefregiratorStatus(_CURSOR_POS buttonPos[6], enum STATUS_BUTTON_MENU currentSelection);
+void printRefregiratorStatus(enum STATUS_BUTTON_MENU currentSelection);
 
 // _ITEM 항목 삭제 
 // // _ITEM 갯수가 5의 배수로 되면 남아있는 메모리 제거후 다시 메모리 획득기능 포함
@@ -190,8 +188,6 @@ void doAction(int option) {
 
 // 전체 항목을 표시해 주는 역할
 void doListItems() {
-    // 가상 버튼 6개
-    _CURSOR_POS buttonPos[6];
 
     // 현재 선택된 메뉴 설정
     enum STATUS_BUTTON_MENU currentSelection = PREVIOUS;
@@ -200,7 +196,7 @@ void doListItems() {
     int arrow;
 
     // 현상태를 인쇄
-    printRefregiratorStatus(buttonPos, currentSelection);
+    printRefregiratorStatus(currentSelection);
 
     bool completed = false;
     while (!completed) {
@@ -238,12 +234,13 @@ void doListItems() {
                 break;
             }
         }
-        printRefregiratorStatus(buttonPos, currentSelection);
+        printRefregiratorStatus(currentSelection);
     }
 
 }
 
-void printRefregiratorStatus(_CURSOR_POS buttonPos[6] ,enum STATUS_BUTTON_MENU currentSelection) {
+// currentSelection에 해당하는 가상 button의 색갈을 TextHighlight로 바꾸어줌
+void printRefregiratorStatus(enum STATUS_BUTTON_MENU currentSelection) {
     clearConsole();
 
     // 현재 시간
@@ -265,7 +262,6 @@ void printRefregiratorStatus(_CURSOR_POS buttonPos[6] ,enum STATUS_BUTTON_MENU c
 
     printf("\n-------------------------------------------------------------------");
     printf("\n지금 만들 수 있는 메뉴\n");
-    getCursorPosition(&buttonPos[RECIPE]);
     if (currentSelection == RECIPE) setTextHighlight();
     printf("[레시피 관리]");
     setTextNormal();
@@ -273,12 +269,10 @@ void printRefregiratorStatus(_CURSOR_POS buttonPos[6] ,enum STATUS_BUTTON_MENU c
     printf("\n-------------------------------------------------------------------");
     printf("\n냉장실(%3d도)", refregiratorTemperature);
     
-    getCursorPosition(&buttonPos[REF_TEMP_UP]);
     if (currentSelection == REF_TEMP_UP) setTextHighlight();
     printf(" [온도올리기] ");
     setTextNormal();
 
-    getCursorPosition(&buttonPos[REF_TEMP_DOWN]);
     if (currentSelection == REF_TEMP_DOWN) setTextHighlight();
     printf(" [온도내리기] ");
     setTextNormal();
@@ -288,12 +282,10 @@ void printRefregiratorStatus(_CURSOR_POS buttonPos[6] ,enum STATUS_BUTTON_MENU c
 
     printf("\n냉동실(%3d도)", freezerTemperature);
 
-    getCursorPosition(&buttonPos[FRE_TEMP_UP]);
     if (currentSelection == FRE_TEMP_UP) setTextHighlight();
     printf(" [온도올리기] ");
     setTextNormal();
 
-    getCursorPosition(&buttonPos[FRE_TEMP_DOWN]);
     if (currentSelection == FRE_TEMP_DOWN) setTextHighlight();
     printf(" [온도내리기] ");
     setTextNormal();
@@ -303,9 +295,8 @@ void printRefregiratorStatus(_CURSOR_POS buttonPos[6] ,enum STATUS_BUTTON_MENU c
 
     printReservedItem();
 
-    getCursorPosition(&buttonPos[PREVIOUS]);
     if (currentSelection == PREVIOUS) setTextHighlight();
-    if(buttonPos) printf("[이전화면으로]\n");
+    printf("[이전화면으로]\n");
     setTextNormal();
 
     printf("\n위 아래 화살표 키로 커서를 선택할 메뉴로 이동한 뒤 엔터를 누르세요\n");
