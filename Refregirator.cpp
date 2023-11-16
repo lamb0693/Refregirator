@@ -10,7 +10,7 @@
 #define ARROW_DOWN 80
 #define ARROW_UP 72
 #define CURSOR_LIMIT_UP 4  // MENU 화면에서 CURSOR가 올라 갈 수 있는 한계
-#define CURSOR_LIMINT_DOWN 8  // MENU 화면에서 CURSOR가 내려 갈 수 있는 한계
+#define CURSOR_LIMINT_DOWN 10  // MENU 화면에서 CURSOR가 내려 갈 수 있는 한계
 #define NO_OF_TITLE_LINE 4  // MENU화면에서 위의 빈줄 수
 
 /* 참고
@@ -38,6 +38,8 @@ typedef struct  {
     int y;
 } _CURSOR_POS;
 
+const char* strFileName = "refregirator.rfr";
+
 
 bool getCursorPosition(_CURSOR_POS* cursor_pos);
 bool setCursorPosition(_CURSOR_POS* cursor_pos);
@@ -58,6 +60,10 @@ bool addReservedItem(_ITEM* item); // 실제 add 기능
 // 저장된 아이템을 수정하는 기능
 bool doModifyItem(); // 수정 기본 작업
 bool modifyReservedItem(int select); // 실제 수정 기능
+// 저장된 file에서 불러 오기
+bool doReadFromFile();
+// file에 현재 data  쓰기
+bool doSaveToFile();
 
 // 위의 함수를 보조하기 위한  함수
 bool printReservedItem();
@@ -71,7 +77,9 @@ const char* MENU[] = {
     "2 >> Remove Food\n",
     "3 >> New Food\n",
     "4 >> Modify Item\n",
-    "5 >> Exit\n"
+    "5 >> File에서 불러오기\n",
+    "6 >> File에 현상태 저장하기\n",
+    "7 >> Exit\n"
 };
 
 // 현재 cursor의 위치
@@ -133,7 +141,13 @@ void doAction(int option) {
     case NO_OF_TITLE_LINE+3:
         if(doModifyItem() == false ) { printf("Error !!! doModifyItem()"); exit(1); }
         break;
-    case NO_OF_TITLE_LINE+4: 
+    case NO_OF_TITLE_LINE + 4:
+        if (doReadFromFile() == false) { printf("Error !!! doReadFromFile()"); exit(1); }
+        break;
+    case NO_OF_TITLE_LINE + 5:
+        if (doSaveToFile() == false) { printf("Error !!! doSaveToFile()"); exit(1); }
+        break;
+    case NO_OF_TITLE_LINE+6: 
         exit(0);
     default:break;
     }
@@ -512,7 +526,7 @@ bool modifyReservedItem(int select) {
             break;
         case 'e':
             time_t newExpireDate;
-            newExpireDate = inputDateFromConsole("새로운 입고 날자");
+            newExpireDate = inputDateFromConsole("새로운 유통 기한");
             if (newExpireDate == -1) printf("\n날자 입력에 실패하셧어요, 다시 시도 하세요");
             else reservedItem->expire_date = newExpireDate;
             retry = 0;
@@ -563,4 +577,75 @@ time_t inputDateFromConsole(const char* message ) {
             }
         }
     }
+}
+
+// 파일에 _ITEM* 저장
+bool doSaveToFile() {
+    // binary 쓰기 모드
+    FILE* filePointer;
+    fopen_s(&filePointer, strFileName, "wb");
+
+    if (filePointer == NULL) {
+        printf("file open에 실패했습니다,  프로그램 제작자와 상의하세요,  아무 키나 누르세요");
+        _getch();
+        return false;
+    }
+
+    // fwrite ( data에 대한 pointer, size of item, count of item, file pointer )
+    // countOfItem 을 쓴다 
+    if (fwrite(&countOfItems, sizeof(int), 1, filePointer) != 1) {
+        fclose(filePointer);
+        printf("file 쓰기에 실패했습니다, 프로그램 제작자와 상의하세요,  아무 키나 누르세요");
+        _getch();
+        return false;
+    }
+
+    // reservedItem 을 쓴다, 
+    if (fwrite(reservedItem, sizeof(_ITEM), countOfItems, filePointer) != countOfItems) {
+        fclose(filePointer);
+        printf("file 쓰기에 실패했습니다, 프로그램 제작자와 상의하세요,  아무 키나 누르세요");
+        _getch();
+        return false;
+    }
+
+    fclose(filePointer);
+
+    return true;
+}
+
+// 파일에서 불러오기
+// 쓸때 차지한  data를 잘 생각해서 복원
+bool doReadFromFile() {
+    FILE* filePointer;
+
+    if (fopen_s(&filePointer, strFileName, "rb") != 0) {
+        printf("file 열기에 실패했습니다, 저장된 파일이 있는지 확인해 보세요, 프로그램 제작자와 상의하세요,  아무 키나 누르세요");
+        _getch();
+        return true;
+    }
+
+    // Read the count of items from the file
+    if (fread(&countOfItems, sizeof(int), 1, filePointer) != 1) {
+        fclose(filePointer);
+        printf("file 읽기에 실패했습니다, 프로그램 제작자와 상의하세요,  아무 키나 누르세요");
+        _getch();
+        return false;
+    }
+
+    // Allocate memory for reservedItem based on the count read from the file
+    free(reservedItem);
+    reservedItem = (_ITEM*)malloc(sizeof(_ITEM) * (*countOfItems));
+
+    // Read reservedItem from the file
+    if (fread(*reservedItem, sizeof(_ITEM), *countOfItems, filePointer) != *countOfItems) {
+        fclose(filePointer);
+        printf("file 읽기에 실패했습니다, 프로그램 제작자와 상의하세요,  아무 키나 누르세요");
+        _getch();
+        free(*reservedItem);
+        return false;
+    }
+
+    fclose(filePointer);
+
+    return true;
 }
