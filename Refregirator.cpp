@@ -160,7 +160,6 @@ void doListItems() {
 
     printf("확인 하셨으면 y 키를 누르세요 >>");
     while (_getch() != 'y') {};
-
 }
 
 // 새로운 항목을 추가 해 줌 - 실제 기능은 addReservedItem() 함수가 시행
@@ -214,9 +213,6 @@ bool doDeleteItem() {
     int select;
     int countOfTry = 0;
 
-    // buffer를 비움
-    while (getchar() != '\n');
-
     while (true) {
         if (countOfTry == 3) break;
 
@@ -262,9 +258,6 @@ bool doModifyItem() {
     int select;
     int countOfTry = 0;
 
-    // buffer를 비움
-    while (getchar() != '\n');
-
     while (true) {
         if (countOfTry == 3) return false;
         printf("\n수정할 아이템의  번호를 입력하세요 >> ");
@@ -291,6 +284,7 @@ bool doModifyItem() {
             } 
         }
         else if (answer == 'n') break;
+
     }
 
     return true;
@@ -304,7 +298,6 @@ bool printReservedItem() {
     for (int i = 0; i < countOfItems; i++) {
         char* start_date = getFormatedStringByTime_t(&reservedItem[i].start_date);
         char* expire_date = getFormatedStringByTime_t(&reservedItem[i].expire_date);
-        //printf("%-20s\n", expire_date);
         printf("%5d  %-20s  %3d개  %-30s  %-30s\n", i, reservedItem[i].name, reservedItem[i].count, start_date, expire_date);
         free(start_date);
         free(expire_date);
@@ -503,6 +496,8 @@ bool modifyReservedItem(int select) {
 
         selectOption = _getch();
         switch (selectOption) {
+        // Enter key를 누르면 \n이 남으므로 buffer를 비움
+        while (getchar() != '\n');
         case 'p':
             char newName[20];
             printf("\n품목의 이름을   입력 하세요 19자 이하>> ");
@@ -581,6 +576,11 @@ time_t inputDateFromConsole(const char* message ) {
 
 // 파일에 _ITEM* 저장
 bool doSaveToFile() {
+    clearConsole();
+    printf("---------------------------------------------\n");
+    printf("파일로 저장");
+    printf("---------------------------------------------\n");
+
     // binary 쓰기 모드
     FILE* filePointer;
     fopen_s(&filePointer, strFileName, "wb");
@@ -610,12 +610,21 @@ bool doSaveToFile() {
 
     fclose(filePointer);
 
+    // 성공 메시지 표시
+    printf("\n파일에서 데이터를 저장했습니다. 아무키나 누르세요 >>");
+    _getch(); 
+
     return true;
 }
 
 // 파일에서 불러오기
 // 쓸때 차지한  data를 잘 생각해서 복원
 bool doReadFromFile() {
+    clearConsole();
+    printf("---------------------------------------------\n");
+    printf("파일에서 불러 오기");
+    printf("---------------------------------------------\n");
+
     FILE* filePointer;
 
     if (fopen_s(&filePointer, strFileName, "rb") != 0) {
@@ -634,18 +643,22 @@ bool doReadFromFile() {
 
     // Allocate memory for reservedItem based on the count read from the file
     free(reservedItem);
-    reservedItem = (_ITEM*)malloc(sizeof(_ITEM) * (*countOfItems));
+    reservedItem = (_ITEM*)malloc(sizeof(_ITEM) * countOfItems);
 
     // Read reservedItem from the file
-    if (fread(*reservedItem, sizeof(_ITEM), *countOfItems, filePointer) != *countOfItems) {
+    if (fread(reservedItem, sizeof(_ITEM), countOfItems, filePointer) != countOfItems) {
         fclose(filePointer);
         printf("file 읽기에 실패했습니다, 프로그램 제작자와 상의하세요,  아무 키나 누르세요");
         _getch();
-        free(*reservedItem);
+        free(reservedItem);
         return false;
     }
 
     fclose(filePointer);
+
+    // 성공 메시지 표시
+    printf("\n파일에서 데이터를 성공적으로 불러 왔습니다. 아무키나 누르세요 >>");
+    _getch();
 
     return true;
 }
